@@ -266,23 +266,26 @@ const Komentar = () => {
         fetchPinnedComment();
     }, []);
 
+    // Di-hoist ke komponen (bukan di dalam useEffect) supaya bisa dipanggil
+    // juga setelah insert komentar — Realtime tidak boleh menjadi satu-satunya
+    // cara daftar komentar ikut ter-refresh.
+    const fetchComments = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('portfolio_comments')
+            .select('*')
+            .eq('is_pinned', false)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching comments:', error);
+            return;
+        }
+
+        setComments(data || []);
+    }, []);
+
     // Fetch regular comments (excluding pinned) and set up real-time subscription
     useEffect(() => {
-        const fetchComments = async () => {
-            const { data, error } = await supabase
-                .from('portfolio_comments')
-                .select('*')
-                .eq('is_pinned', false)
-                .order('created_at', { ascending: false });
-            
-            if (error) {
-                console.error('Error fetching comments:', error);
-                return;
-            }
-            
-            setComments(data || []);
-        };
-
         fetchComments();
 
         // Set up real-time subscription
@@ -304,7 +307,7 @@ const Komentar = () => {
         return () => {
             subscription.unsubscribe();
         };
-    }, []);
+    }, [fetchComments]);
 
     const uploadImage = useCallback(async (imageFile) => {
         if (!imageFile) return null;
@@ -350,13 +353,17 @@ const Komentar = () => {
             if (error) {
                 throw error;
             }
+
+            // Refresh langsung setelah insert: komentar baru langsung tampil
+            // walau Realtime belum diaktifkan untuk tabel ini.
+            fetchComments();
         } catch (error) {
             setError('Failed to post comment. Please try again.');
             console.error('Error adding comment: ', error);
         } finally {
             setIsSubmitting(false);
         }
-    }, [uploadImage]);
+    }, [uploadImage, fetchComments]);
 
     const formatDate = useCallback((timestamp) => {
         if (!timestamp) return '';

@@ -12,33 +12,46 @@ const AnimatedBackground = () => {
 	const blobRefs = useRef([])
 
 	useEffect(() => {
-		let requestId
+		// requestId null = tidak ada frame yang dijadwalkan. Nilai ini harus
+		// dikembalikan ke null di dalam callback, dan TIDAK boleh memanggil
+		// requestAnimationFrame(handleScroll) lagi — itulah bug lamanya:
+		// loop yang menjadwalkan dirinya sendiri tanpa henti (60fps seumur hidup).
+		let requestId = null
 
-		const handleScroll = () => {
+		const applyPositions = () => {
 			const newScroll = window.pageYOffset
 
 			blobRefs.current.forEach((blob, index) => {
 				const initialPos = INITIAL_POSITIONS[index]
+				if (!blob || !initialPos) return
 
 				// Calculating movement in both X and Y direction
 				const xOffset = Math.sin(newScroll / 100 + index * 0.5) * 340 // Horizontal movement
 				const yOffset = Math.cos(newScroll / 100 + index * 0.5) * 40 // Vertical movement
 
-				const x = initialPos.x + xOffset
-				const y = initialPos.y + yOffset
-
-				// Apply transformation with smooth transition
-				blob.style.transform = `translate(${x}px, ${y}px)`
-				blob.style.transition = "transform 1.4s ease-out"
+				blob.style.transform = `translate(${initialPos.x + xOffset}px, ${initialPos.y + yOffset}px)`
 			})
-
-			requestId = requestAnimationFrame(handleScroll)
 		}
 
-		window.addEventListener("scroll", handleScroll)
+		// Maksimal satu update per frame, dan hanya ketika user scroll.
+		const handleScroll = () => {
+			if (requestId !== null) return
+			requestId = requestAnimationFrame(() => {
+				requestId = null
+				applyPositions()
+			})
+		}
+
+		// Transisi disetel sekali di sini, bukan ditulis ulang tiap frame.
+		blobRefs.current.forEach((blob) => {
+			if (blob) blob.style.transition = "transform 1.4s ease-out"
+		})
+		applyPositions()
+
+		window.addEventListener("scroll", handleScroll, { passive: true })
 		return () => {
 			window.removeEventListener("scroll", handleScroll)
-			cancelAnimationFrame(requestId)
+			if (requestId !== null) cancelAnimationFrame(requestId)
 		}
 	}, [])
 

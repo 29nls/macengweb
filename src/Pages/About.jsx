@@ -124,9 +124,20 @@ const AboutPage = () => {
   });
 
   useEffect(() => {
+    // Cache korup (bukan JSON valid) tidak boleh membuat seluruh halaman
+    // crash — kembalikan daftar kosong agar statistik hanya menampilkan 0.
+    const readCachedList = (key) => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
     const updateStats = () => {
-      const storedProjects = JSON.parse(localStorage.getItem("projects") || "[]");
-      const storedCertificates = JSON.parse(localStorage.getItem("certificates") || "[]");
+      const storedProjects = readCachedList("projects");
+      const storedCertificates = readCachedList("certificates");
       
       const startDate = new Date("2021-11-06");
       const today = new Date();

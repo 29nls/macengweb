@@ -80,6 +80,13 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 
 Go to your Supabase project → **SQL Editor** → run the script below (run once):
 
+> **Tip:** the ready-to-run version of this script lives in [`setup.sql`](./setup.sql)
+> in the repo root. It is idempotent (safe to re-run on a new *or* existing
+> database) and already includes both security hardening policies:
+> unpublished projects are hidden from the anon API, and the `profile-images`
+> bucket only accepts image files. Incremental versions for the Supabase CLI
+> are in `supabase/migrations/`.
+
 ```sql
 -- ============================
 -- TABLES
@@ -136,8 +143,12 @@ FOR SELECT
 TO authenticated
 USING ((SELECT auth.uid()) = id);
 
-CREATE POLICY "public read projects"
-ON public.projects FOR SELECT USING (true);
+-- Hanya proyek yang dipublikasikan yang bisa dibaca siapa pun.
+-- Proyek draft hanya bisa dibaca oleh admin (policy "admin manage projects").
+-- Kebijakan ini juga tersedia sebagai migration:
+-- supabase/migrations/20260927000000_projects_publish_rls.sql
+CREATE POLICY "public read published projects"
+ON public.projects FOR SELECT USING (is_published IS NOT FALSE);
 
 CREATE POLICY "public read certificates"
 ON public.certificates FOR SELECT USING (true);
@@ -226,10 +237,18 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('profile-images', 'profile-images', true)
 ON CONFLICT DO NOTHING;
 
-CREATE POLICY "public upload profile images"
+-- Hanya berkas gambar yang boleh diunggah siapa pun ke bucket ini
+-- (foto profil untuk komentar pengunjung). Tanpa filter ini, siapa pun
+-- bisa menyimpan file apa pun (HTML, arsip, dst.) ke bucket publik.
+-- Kebijakan ini juga tersedia sebagai migration:
+-- supabase/migrations/20260927000001_profile_images_upload_restricted.sql
+CREATE POLICY "profile images are images only"
 ON storage.objects FOR INSERT
 TO public
-WITH CHECK (bucket_id = 'profile-images');
+WITH CHECK (
+  bucket_id = 'profile-images'
+  AND name ~* '\.(jpg|jpeg|png|gif|webp|avif)$'
+);
 
 CREATE POLICY "public read profile images"
 ON storage.objects FOR SELECT

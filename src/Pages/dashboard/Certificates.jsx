@@ -62,8 +62,14 @@ export default function Certificates() {
 
   const fetchCerts = async () => {
     setLoading(true)
-    const { data } = await supabase.from('certificates').select('*').order('created_at', { ascending: false })
-    setCerts(data || [])
+    const { data, error } = await supabase.from('certificates').select('*').order('created_at', { ascending: false })
+    if (error) {
+      // Jangan menimpa daftar yang sudah ada kalau permintaan gagal —
+      // sebelumnya data null membuat halaman menampilkan "No certificates".
+      console.error('Failed to load certificates:', error.message)
+    } else {
+      setCerts(data || [])
+    }
     setLoading(false)
   }
 
@@ -78,17 +84,34 @@ export default function Certificates() {
   const uploadImage = async () => {
     if (!file) return
     setUploading(true)
-    const fileName = `cert-${Date.now()}-${file.name}`
-    await supabase.storage.from('certificate-images').upload(fileName, file)
-    const { data } = supabase.storage.from('certificate-images').getPublicUrl(fileName)
-    await supabase.from('certificates').insert({ Img: data.publicUrl })
-    setFile(null); setPreview(null); setUploading(false)
-    fetchCerts()
+    try {
+      const fileName = `cert-${Date.now()}-${file.name}`
+      const { error: uploadError } = await supabase.storage.from('certificate-images').upload(fileName, file)
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('certificate-images').getPublicUrl(fileName)
+      const { error: insertError } = await supabase.from('certificates').insert({ Img: data.publicUrl })
+      if (insertError) throw insertError
+
+      // Hanya dibersihkan kalau semuanya berhasil, jadi file tetap
+      // terpilih dan bisa langsung diunggah ulang setelah gagal.
+      setFile(null); setPreview(null)
+    } catch (error) {
+      console.error('Failed to upload certificate:', error)
+      alert(`Failed to upload certificate: ${error.message}`)
+    } finally {
+      setUploading(false)
+      fetchCerts()
+    }
   }
 
   const deleteCert = async (id) => {
     if (!confirm('Delete this certificate?')) return
-    await supabase.from('certificates').delete().eq('id', id)
+    const { error } = await supabase.from('certificates').delete().eq('id', id)
+    if (error) {
+      console.error('Failed to delete certificate:', error)
+      alert(`Failed to delete certificate: ${error.message}`)
+    }
     fetchCerts()
   }
 

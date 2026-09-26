@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 
 import { supabase } from "../supabase"; 
+import { prepareProjects } from "../utils/projects";
 
 import PropTypes from "prop-types";
 import SwipeableViews from "react-swipeable-views";
@@ -139,7 +140,13 @@ export default function FullWidthTabs() {
     try {
       // Mengambil data dari Supabase secara paralel
       const [projectsResponse, certificatesResponse] = await Promise.all([
-        supabase.from("projects").select("*").order('id', { ascending: false }),
+        // Hanya proyek yang dipublikasikan, diurutkan sesuai order_index.
+        supabase
+          .from("projects")
+          .select("*")
+          .or("is_published.eq.true,is_published.is.null")
+          .order("order_index", { ascending: true })
+          .order("id", { ascending: false }),
         supabase.from("certificates").select("*").order('id', { ascending: false }), 
       ]);
 
@@ -148,7 +155,9 @@ export default function FullWidthTabs() {
       if (certificatesResponse.error) throw certificatesResponse.error;
 
       // Supabase mengembalikan data dalam properti 'data'
-      const projectData = projectsResponse.data || [];
+      // Filter & urutan diterapkan lagi di sisi klien sebagai jaring pengaman,
+      // supaya proyek yang belum dipublikasikan tidak pernah ikut tersimpan di cache.
+      const projectData = prepareProjects(projectsResponse.data);
       const certificateData = certificatesResponse.data || [];
 
       setProjects(projectData);
@@ -173,8 +182,17 @@ export default function FullWidthTabs() {
     const cachedCertificates = localStorage.getItem('certificates');
 
     if (cachedProjects && cachedCertificates) {
-        setProjects(JSON.parse(cachedProjects));
-        setCertificates(JSON.parse(cachedCertificates));
+        try {
+            // Cache lama bisa masih berisi proyek yang kini sudah tidak dipublikasikan,
+            // jadi simpan ulang dalam keadaan sudah tersaring dan terurut.
+            setProjects(prepareProjects(JSON.parse(cachedProjects)));
+            setCertificates(JSON.parse(cachedCertificates));
+        } catch {
+            // Cache korup: buang supaya tidak terus-menerus gagal dibaca,
+            // fetchData() di bawah akan mengisi ulang dari server.
+            localStorage.removeItem('projects');
+            localStorage.removeItem('certificates');
+        }
     }
     
     fetchData(); // Tetap panggil fetchData untuk sinkronisasi data terbaru

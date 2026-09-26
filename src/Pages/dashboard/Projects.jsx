@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../supabase";
+import { isProjectPublished } from "../../utils/projects";
 import {
   Plus,
   Trash2,
@@ -10,6 +11,8 @@ import {
   ExternalLink,
   Github,
   Pencil,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 const Card = ({ children, className = "" }) => (
@@ -71,8 +74,9 @@ const SkeletonCard = () => (
   </div>
 );
 
-const ProjectCard = ({ project, onDelete, onEdit }) => {
+const ProjectCard = ({ project, onDelete, onEdit, onTogglePublish }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const published = isProjectPublished(project);
 
   return (
     <Card>
@@ -90,9 +94,28 @@ const ProjectCard = ({ project, onDelete, onEdit }) => {
             />
           </div>
         )}
-        <h3 className="font-semibold text-white text-sm mb-1">
-          {project.Title}
-        </h3>
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <h3 className="font-semibold text-white text-sm">
+            {project.Title}
+          </h3>
+          <button
+            type="button"
+            onClick={() => onTogglePublish(project)}
+            aria-pressed={published}
+            title={published ? "Unpublish project" : "Publish project"}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
+              published
+                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20"
+                : "border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20"
+            }`}
+          >
+            {published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            {published ? "Published" : "Draft"}
+          </button>
+          <span className="ml-auto text-[10px] text-gray-500">
+            Order {project.order_index ?? 0}
+          </span>
+        </div>
         {project.Description && (
           <p className="text-gray-400 text-xs mb-3 line-clamp-2 leading-relaxed">
             {project.Description}
@@ -201,6 +224,8 @@ const ProjectForm = ({
       : initial?.Features || "",
     Link: initial?.Link || "",
     Github: initial?.Github || "",
+    is_published: initial ? isProjectPublished(initial) : true,
+    order_index: initial?.order_index ?? 0,
   });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(initial?.Img || null);
@@ -269,6 +294,53 @@ const ProjectForm = ({
           value={form.Github}
           onChange={set("Github")}
           placeholder="https://github.com/username/repo"
+        />
+
+        <div className="space-y-1.5">
+          <label className="text-xs text-indigo-300/70 uppercase tracking-wider font-medium">
+            Publish Status
+          </label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.is_published}
+            onClick={() =>
+              setForm((f) => ({ ...f, is_published: !f.is_published }))
+            }
+            className={`w-full flex items-center justify-between gap-3 border rounded-xl px-4 py-2.5 text-sm transition-all ${
+              form.is_published
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:border-emerald-500/50"
+                : "bg-[#0d0d22] border-white/10 text-gray-300 hover:border-white/20"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              {form.is_published ? (
+                <Eye className="w-4 h-4" />
+              ) : (
+                <EyeOff className="w-4 h-4" />
+              )}
+              {form.is_published ? "Published" : "Draft (hidden)"}
+            </span>
+            <span
+              className={`relative w-9 h-5 rounded-full transition-colors ${
+                form.is_published ? "bg-emerald-500/70" : "bg-white/10"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  form.is_published ? "translate-x-4" : ""
+                }`}
+              />
+            </span>
+          </button>
+        </div>
+
+        <InputField
+          label="Order (order_index)"
+          type="number"
+          value={form.order_index}
+          onChange={set("order_index")}
+          placeholder="0"
         />
 
         <div className="sm:col-span-2 space-y-1.5">
@@ -340,11 +412,20 @@ export default function Projects() {
 
   const fetchProjects = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("projects")
       .select("*")
-      .order("created_at", { ascending: false });
-    setProjects(data || []);
+      // Disamakan dengan urutan di beranda: order_index naik, lalu id turun,
+      // supaya urutan di dashboard = urutan yang dilihat pengunjung.
+      .order("order_index", { ascending: true })
+      .order("id", { ascending: false });
+    if (error) {
+      // Jangan menimpa daftar yang sudah ada kalau permintaan gagal —
+      // sebelumnya data null membuat halaman menampilkan "No projects yet".
+      console.error("Failed to load projects:", error.message);
+    } else {
+      setProjects(data || []);
+    }
     setLoading(false);
   };
 
@@ -354,7 +435,12 @@ export default function Projects() {
 
   const uploadImage = async (f) => {
     const fileName = `${Date.now()}-${f.name}`;
-    await supabase.storage.from("project-images").upload(fileName, f);
+    // Upload yang gagal harus menghentikan penyimpanan, bukan menyimpan
+    // URL gambar yang tidak pernah ada ke database.
+    const { error } = await supabase.storage
+      .from("project-images")
+      .upload(fileName, f);
+    if (error) throw error;
     const { data } = supabase.storage
       .from("project-images")
       .getPublicUrl(fileName);
@@ -363,33 +449,10 @@ export default function Projects() {
 
   const handleCreate = async (form, file) => {
     setUploading(true);
-    let imgUrl = "";
-    if (file) imgUrl = await uploadImage(file);
-    await supabase.from("projects").insert({
-      Title: form.Title,
-      Description: form.Description,
-      Img: imgUrl,
-      TechStack: form.TechStack.split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      Features: form.Features.split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      Link: form.Link,
-      Github: form.Github,
-    });
-    setShowCreate(false);
-    setUploading(false);
-    fetchProjects();
-  };
-
-  const handleEdit = async (form, file) => {
-    setUploading(true);
-    let imgUrl = editProject.Img || "";
-    if (file) imgUrl = await uploadImage(file);
-    await supabase
-      .from("projects")
-      .update({
+    try {
+      let imgUrl = "";
+      if (file) imgUrl = await uploadImage(file);
+      const { error } = await supabase.from("projects").insert({
         Title: form.Title,
         Description: form.Description,
         Img: imgUrl,
@@ -401,17 +464,81 @@ export default function Projects() {
           .filter(Boolean),
         Link: form.Link,
         Github: form.Github,
-      })
-      .eq("id", editProject.id);
-    setEditProject(null);
-    setUploading(false);
-    fetchProjects();
+        is_published: form.is_published,
+        order_index: Number(form.order_index) || 0,
+      });
+      if (error) throw error;
+      setShowCreate(false);
+    } catch (error) {
+      // Modal tetap terbuka supaya isian admin tidak hilang.
+      console.error("Failed to save project:", error);
+      alert(`Failed to save project: ${error.message}`);
+    } finally {
+      setUploading(false);
+      fetchProjects();
+    }
+  };
+
+  const handleEdit = async (form, file) => {
+    setUploading(true);
+    try {
+      let imgUrl = editProject.Img || "";
+      if (file) imgUrl = await uploadImage(file);
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          Title: form.Title,
+          Description: form.Description,
+          Img: imgUrl,
+          TechStack: form.TechStack.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          Features: form.Features.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          Link: form.Link,
+          Github: form.Github,
+          is_published: form.is_published,
+          order_index: Number(form.order_index) || 0,
+        })
+        .eq("id", editProject.id);
+      if (error) throw error;
+      setEditProject(null);
+    } catch (error) {
+      // Modal edit tidak ditutup saat gagal, admin masih bisa memperbaiki.
+      console.error("Failed to update project:", error);
+      alert(`Failed to update project: ${error.message}`);
+    } finally {
+      setUploading(false);
+      fetchProjects();
+    }
   };
 
   const deleteProject = async (id) => {
     if (!confirm("Delete this project?")) return;
-    await supabase.from("projects").delete().eq("id", id);
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) {
+      console.error("Failed to delete project:", error);
+      alert(`Failed to delete project: ${error.message}`);
+    }
     fetchProjects();
+  };
+
+  const handleTogglePublish = async (project) => {
+    const is_published = !isProjectPublished(project);
+    // Update optimis supaya daftar tidak berkedip ke skeleton saat ditoggle.
+    setProjects((prev) =>
+      prev.map((p) => (p.id === project.id ? { ...p, is_published } : p)),
+    );
+    const { error } = await supabase
+      .from("projects")
+      .update({ is_published })
+      .eq("id", project.id);
+    if (error) {
+      console.error("Failed to update publish status:", error);
+      alert(`Failed to update publish status: ${error.message}`);
+      fetchProjects(); // Ambil ulang supaya tampilan kembali sesuai server.
+    }
   };
 
   return (
@@ -496,6 +623,7 @@ export default function Projects() {
               project={project}
               onDelete={deleteProject}
               onEdit={setEditProject}
+              onTogglePublish={handleTogglePublish}
             />
           ))}
         </div>

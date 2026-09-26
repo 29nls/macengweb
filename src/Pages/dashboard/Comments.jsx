@@ -32,12 +32,17 @@ export default function Comments() {
 
   const fetchComments = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("portfolio_comments")
       .select("*")
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false });
-    setComments(data || []);
+    if (error) {
+      // Pertahankan data lama saat gagal, jangan ganti dengan kosong.
+      console.error("Failed to load comments:", error.message);
+    } else {
+      setComments(data || []);
+    }
     setLoading(false);
   };
 
@@ -51,16 +56,27 @@ export default function Comments() {
   }, [filter, search]);
 
   const pin = async (id, value) => {
-    await supabase
+    const { error } = await supabase
       .from("portfolio_comments")
       .update({ is_pinned: value })
       .eq("id", id);
+    if (error) {
+      console.error("Failed to update pin status:", error);
+      alert(`Failed to update pin status: ${error.message}`);
+    }
     fetchComments();
   };
 
   const remove = async (id) => {
     if (!confirm("Delete this comment?")) return;
-    await supabase.from("portfolio_comments").delete().eq("id", id);
+    const { error } = await supabase
+      .from("portfolio_comments")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      console.error("Failed to delete comment:", error);
+      alert(`Failed to delete comment: ${error.message}`);
+    }
     fetchComments();
   };
 

@@ -3,6 +3,10 @@ import { ExternalLink, ArrowRight } from "lucide-react";
 import { toSlug } from "../utils/slug";
 
 const CardProject = ({ Img, Title, Description, Link: ProjectLink, id }) => {
+  // Slug bisa kosong untuk judul yang tidak menghasilkan karakter valid;
+  // jangan tautkan ke /project/ (route itu butuh segmen slug).
+  const slug = toSlug(Title);
+
   const handleLiveDemo = (e) => {
     if (!ProjectLink) {
       console.log("ProjectLink kosong");
@@ -12,8 +16,8 @@ const CardProject = ({ Img, Title, Description, Link: ProjectLink, id }) => {
   };
 
   const handleDetails = (e) => {
-    if (!id) {
-      console.log("ID kosong");
+    if (!id || !slug) {
+      console.log("ID kosong atau slug tidak valid");
       e.preventDefault();
       alert("Project details are not available");
     }
@@ -60,9 +64,9 @@ const CardProject = ({ Img, Title, Description, Link: ProjectLink, id }) => {
                 </span>
               )}
 
-              {id ? (
+              {id && slug ? (
                 <Link
-                  to={`/project/${toSlug(Title)}`}
+                  to={`/project/${slug}`}
                   onClick={handleDetails}
                   className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/90 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 >

@@ -43,8 +43,11 @@ const ContactPage = () => {
     });
 
     try {
-      // Ganti dengan email Anda di FormSubmit
-      const formSubmitUrl = 'https://formsubmit.co/ekizulfarrachman@gmail.com';
+      // Ganti dengan email Anda di FormSubmit.
+      // Endpoint /ajax/ mendukung CORS, jadi kode status respons benar-benar
+      // terbaca — tanpa ini, respons yang diblokir CORS selalu terlihat
+      // seperti error status 0.
+      const formSubmitUrl = 'https://formsubmit.co/ajax/ekizulfarrachman@gmail.com';
       
       // Siapkan data form untuk FormSubmit
       const submitData = new FormData();
@@ -78,29 +81,16 @@ const ContactPage = () => {
       });
 
     } catch (error) {
-      if (error.request && error.request.status === 0) {
-        Swal.fire({
-          title: 'Berhasil!',
-          text: 'Pesan Anda telah berhasil terkirim!',
-          icon: 'success',
-          confirmButtonColor: '#6366f1',
-          timer: 2000,
-          timerProgressBar: true
-        });
-
-        setFormData({
-          name: "",
-          email: "",
-          message: "",
-        });
-      } else {
-        Swal.fire({
-          title: 'Gagal!',
-          text: 'Terjadi kesalahan. Silakan coba lagi nanti.',
-          icon: 'error',
-          confirmButtonColor: '#6366f1'
-        });
-      }
+      // Semua kegagalan (offline, CORS, server error) harus tampil sebagai
+      // gagal — sebelumnya status 0 (request tak pernah sampai) justru
+      // dilaporkan "Berhasil" dan isian form dibuang.
+      console.error("Gagal mengirim pesan:", error);
+      Swal.fire({
+        title: 'Gagal!',
+        text: 'Pesan tidak dapat dikirim. Periksa koneksi internetmu, lalu coba lagi.',
+        icon: 'error',
+        confirmButtonColor: '#6366f1'
+      });
     } finally {
       setIsSubmitting(false);
     }

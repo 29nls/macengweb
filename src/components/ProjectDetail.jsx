@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ExternalLink,
@@ -14,9 +14,15 @@ import {
   Package,
   Cpu,
   Code,
+  Home,
+  RefreshCw,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { toSlug } from "../utils/slug";
+import { prepareProjects, isProjectPublished } from "../utils/projects";
+import { supabase } from "../supabase";
+
+const CACHE_KEY = "projects";
 
 const TECH_ICONS = {
   React: Globe,
@@ -28,6 +34,32 @@ const TECH_ICONS = {
   CSS: Code,
   default: Package,
 };
+
+// Slug di-generate dari Title, jadi pencarian tetap dilakukan di sisi klien
+// (sama seperti Portofolio) karena tabel projects tidak punya kolom slug.
+// Hanya proyek yang dipublikasikan yang boleh cocok — proyek yang belum
+// dipublikasikan diperlakukan sama dengan proyek yang tidak ada.
+const findProjectBySlug = (projects, slug) =>
+  (Array.isArray(projects) ? projects : [])
+    .filter(isProjectPublished)
+    .find((project) => toSlug(project.Title) === slug);
+
+const readCachedProjects = () => {
+  try {
+    // Cache bisa berisi proyek yang sudah tidak dipublikasikan (cache lama),
+    // jadi hasilnya disaring dan diurutkan dulu sebelum dipakai.
+    return prepareProjects(JSON.parse(localStorage.getItem(CACHE_KEY)));
+  } catch {
+    return [];
+  }
+};
+
+const enhanceProject = (project) => ({
+  ...project,
+  Features: project.Features || [],
+  TechStack: project.TechStack || [],
+  Github: project.Github || "https://github.com/EkiZR",
+});
 
 const TechBadge = ({ tech }) => {
   const Icon = TECH_ICONS[tech] || TECH_ICONS["default"];
@@ -118,31 +150,265 @@ const handleGithubClick = (githubLink) => {
   return true;
 };
 
+const DetailStyles = () => (
+  <style>{`
+    @keyframes blob {
+      0% {
+        transform: translate(0px, 0px) scale(1);
+      }
+      33% {
+        transform: translate(30px, -50px) scale(1.1);
+      }
+      66% {
+        transform: translate(-20px, 20px) scale(0.9);
+      }
+      100% {
+        transform: translate(0px, 0px) scale(1);
+      }
+    }
+    .animate-blob {
+      animation: blob 10s infinite;
+    }
+    .animation-delay-2000 {
+      animation-delay: 2s;
+    }
+    .animation-delay-4000 {
+      animation-delay: 4s;
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.7s ease-out;
+    }
+    .animate-slideInLeft {
+      animation: slideInLeft 0.7s ease-out;
+    }
+    .animate-slideInRight {
+      animation: slideInRight 0.7s ease-out;
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+  `}</style>
+);
+
+const Backdrop = () => (
+  <div className="fixed inset-0">
+    <div className="absolute -inset-[10px] opacity-20">
+      <div className="absolute top-0 -left-4 w-72 md:w-96 h-72 md:h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
+      <div className="absolute top-0 -right-4 w-72 md:w-96 h-72 md:h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000" />
+      <div className="absolute -bottom-8 left-20 w-72 md:w-96 h-72 md:h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000" />
+    </div>
+    <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.02]" />
+  </div>
+);
+
+const primaryActionClass =
+  "group inline-flex items-center gap-2 px-5 md:px-7 py-2.5 md:py-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 text-blue-200 rounded-xl border border-blue-500/20 hover:border-blue-500/40 backdrop-blur-xl transition-all duration-300 text-sm md:text-base";
+
+const secondaryActionClass =
+  "group inline-flex items-center gap-2 px-5 md:px-7 py-2.5 md:py-3 bg-white/5 hover:bg-white/10 text-white/90 rounded-xl border border-white/10 hover:border-white/20 backdrop-blur-xl transition-all duration-300 text-sm md:text-base";
+
+const StatusScreen = ({ code, title, description, actions }) => (
+  <div className="min-h-screen bg-[#030014] relative overflow-hidden flex items-center justify-center px-[5%]">
+    <Backdrop />
+    <div className="relative z-10 w-full max-w-2xl text-center space-y-5 md:space-y-6 py-24 animate-fadeIn">
+      {code && (
+        <p className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 bg-clip-text text-transparent">
+          {code}
+        </p>
+      )}
+      <h1 className="text-2xl md:text-4xl font-bold text-white">{title}</h1>
+      <p className="text-sm md:text-base text-gray-400 leading-relaxed">
+        {description}
+      </p>
+      {actions && (
+        <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4 pt-2">
+          {actions}
+        </div>
+      )}
+    </div>
+    <DetailStyles />
+  </div>
+);
+
+// Section #Portofolio baru dirender setelah WelcomeScreen selesai (~4 detik),
+// jadi elemennya ditunggu sampai muncul lalu digulir. Timer ini mengakhiri
+// dirinya sendiri, jadi aman walau komponen pemanggilnya sudah unmount.
+const scrollToPortfolioSection = () => {
+  let attempts = 0;
+  const timer = setInterval(() => {
+    const section = document.querySelector("#Portofolio");
+    if (section) {
+      clearInterval(timer);
+      section.scrollIntoView({ behavior: "smooth" });
+    } else if (++attempts > 120) {
+      clearInterval(timer);
+    }
+  }, 100);
+};
+
+const ProjectNotFound = ({ slug }) => {
+  const navigate = useNavigate();
+
+  const goToProjects = () => {
+    navigate("/");
+    scrollToPortfolioSection();
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>Project Tidak Ditemukan — Eki Zulfar Rachman</title>
+        <meta name="robots" content="noindex, follow" />
+      </Helmet>
+      <StatusScreen
+        code="404"
+        title="Project tidak ditemukan"
+        description={
+          <>
+            Tautan dengan alamat{" "}
+            <span className="text-white/90 font-medium break-all">
+              “{slug}”
+            </span>{" "}
+            tidak cocok dengan project mana pun. Mungkin tautannya salah ketik,
+            atau projectnya sudah tidak ada lagi.
+          </>
+        }
+        actions={
+          <>
+            <Link to="/" className={primaryActionClass}>
+              <Home className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="font-medium">Kembali ke Home</span>
+            </Link>
+            <button onClick={goToProjects} className={secondaryActionClass}>
+              <Layers className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="font-medium">Lihat Semua Project</span>
+            </button>
+          </>
+        }
+      />
+    </>
+  );
+};
+
+const ProjectLoadError = ({ onRetry }) => (
+  <>
+    <Helmet>
+      <title>Gagal Memuat Project — Eki Zulfar Rachman</title>
+      <meta name="robots" content="noindex, follow" />
+    </Helmet>
+    <StatusScreen
+      code="Oops!"
+      title="Gagal memuat project"
+      description="Kami tidak bisa mengambil data project dari server. Periksa koneksi internetmu, lalu coba lagi."
+      actions={
+        <>
+          <button onClick={onRetry} className={primaryActionClass}>
+            <RefreshCw className="w-4 h-4 md:w-5 md:h-5 group-hover:rotate-180 transition-transform duration-500" />
+            <span className="font-medium">Coba Lagi</span>
+          </button>
+          <Link to="/" className={secondaryActionClass}>
+            <Home className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="font-medium">Kembali ke Home</span>
+          </Link>
+        </>
+      }
+    />
+  </>
+);
+
 const ProjectDetails = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
+  // "loading" | "ready" | "notfound" | "error"
+  const [status, setStatus] = useState("loading");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const storedProjects = JSON.parse(localStorage.getItem("projects")) || [];
-    // Cari project berdasarkan slug yang di-generate dari Title
-    const selectedProject = storedProjects.find(
-      (p) => toSlug(p.Title) === slug,
-    );
+    let cancelled = false;
 
-    if (selectedProject) {
-      const enhancedProject = {
-        ...selectedProject,
-        Features: selectedProject.Features || [],
-        TechStack: selectedProject.TechStack || [],
-        Github: selectedProject.Github || "https://github.com/EkiZR",
-      };
-      setProject(enhancedProject);
-    }
-  }, [slug]);
+    // Cache dipakai lebih dulu supaya halaman langsung tampil,
+    // lalu data terbaru diambil dari Supabase.
+    const cachedProject = findProjectBySlug(readCachedProjects(), slug);
+    setProject(cachedProject ? enhanceProject(cachedProject) : null);
+    setStatus(cachedProject ? "ready" : "loading");
 
-  if (!project) {
+    const loadProject = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("*")
+          .or("is_published.eq.true,is_published.is.null")
+          .order("order_index", { ascending: true })
+          .order("id", { ascending: false });
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        // Hasil server disaring & diurutkan ulang di sisi klien juga, supaya
+        // proyek yang belum dipublikasikan tidak pernah masuk ke cache bersama.
+        const projects = prepareProjects(data);
+        localStorage.setItem(CACHE_KEY, JSON.stringify(projects));
+        window.dispatchEvent(new Event("portfolioDataUpdated"));
+
+        const freshProject = findProjectBySlug(projects, slug);
+        if (freshProject) {
+          setProject(enhanceProject(freshProject));
+          setStatus("ready");
+        } else {
+          // Data server adalah sumber kebenaran: slug tidak ada di sana.
+          setStatus("notfound");
+        }
+      } catch (error) {
+        console.error("Gagal memuat project dari Supabase:", error.message);
+        if (cancelled) return;
+        // Kalau cache ada, halaman tetap bisa dibaca; kalau tidak, tawarkan coba lagi.
+        if (!cachedProject) setStatus("error");
+      }
+    };
+
+    loadProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, reloadKey]);
+
+  if (status === "notfound") {
+    return <ProjectNotFound slug={slug} />;
+  }
+
+  if (status === "error") {
+    return <ProjectLoadError onRetry={() => setReloadKey((key) => key + 1)} />;
+  }
+
+  if (status !== "ready" || !project) {
     return (
       <div className="min-h-screen bg-[#030014] flex items-center justify-center">
         <div className="text-center space-y-6 animate-fadeIn">
@@ -151,6 +417,7 @@ const ProjectDetails = () => {
             Loading Project...
           </h2>
         </div>
+        <DetailStyles />
       </div>
     );
   }
@@ -199,14 +466,7 @@ const ProjectDetails = () => {
       </Helmet>
 
       <div className="min-h-screen bg-[#030014] px-[2%] sm:px-0 relative overflow-hidden">
-        <div className="fixed inset-0">
-          <div className="absolute -inset-[10px] opacity-20">
-            <div className="absolute top-0 -left-4 w-72 md:w-96 h-72 md:h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
-            <div className="absolute top-0 -right-4 w-72 md:w-96 h-72 md:h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000" />
-            <div className="absolute -bottom-8 left-20 w-72 md:w-96 h-72 md:h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000" />
-          </div>
-          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.02]" />
-        </div>
+        <Backdrop />
 
         <div className="relative">
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-16">
@@ -324,68 +584,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        <style>{`
-          @keyframes blob {
-            0% {
-              transform: translate(0px, 0px) scale(1);
-            }
-            33% {
-              transform: translate(30px, -50px) scale(1.1);
-            }
-            66% {
-              transform: translate(-20px, 20px) scale(0.9);
-            }
-            100% {
-              transform: translate(0px, 0px) scale(1);
-            }
-          }
-          .animate-blob {
-            animation: blob 10s infinite;
-          }
-          .animation-delay-2000 {
-            animation-delay: 2s;
-          }
-          .animation-delay-4000 {
-            animation-delay: 4s;
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.7s ease-out;
-          }
-          .animate-slideInLeft {
-            animation: slideInLeft 0.7s ease-out;
-          }
-          .animate-slideInRight {
-            animation: slideInRight 0.7s ease-out;
-          }
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-            }
-            to {
-              opacity: 1;
-            }
-          }
-          @keyframes slideInLeft {
-            from {
-              opacity: 0;
-              transform: translateX(-30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-          @keyframes slideInRight {
-            from {
-              opacity: 0;
-              transform: translateX(30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-        `}</style>
+        <DetailStyles />
       </div>
     </>
   );
