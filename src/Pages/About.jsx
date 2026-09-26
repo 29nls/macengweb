@@ -1,5 +1,5 @@
-import React, { useEffect, useState, memo, useMemo } from "react"
-import { FileText, Code, Award, Globe, ArrowUpRight, Sparkles, UserCheck } from "lucide-react"
+import { useEffect, useState, memo, useMemo } from "react"
+import { FileText, Code, Award, Globe, ArrowUpRight, Sparkles } from "lucide-react"
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 
@@ -26,6 +26,7 @@ const Header = memo(() => (
     </p>
   </div>
 ));
+Header.displayName = "Header";
 
 const ProfileImage = memo(() => (
   <div className="flex justify-end items-center sm:p-12 sm:py-0 sm:pb-0 p-0 py-2 pb-2">
@@ -67,6 +68,7 @@ const ProfileImage = memo(() => (
     </div>
   </div>
 ));
+ProfileImage.displayName = "ProfileImage";
 
 const StatCard = memo(({ icon: Icon, color, value, label, description, animation }) => (
   <div data-aos={animation} data-aos-duration={1300} className="relative group">
@@ -111,6 +113,7 @@ const StatCard = memo(({ icon: Icon, color, value, label, description, animation
     </div>
   </div>
 ));
+StatCard.displayName = "StatCard";
 
 const AboutPage = () => {
   // Memoized calculations
@@ -221,7 +224,7 @@ const AboutPage = () => {
               data-aos-duration="1000"
             >
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#6366f1] to-[#a855f7]">
-                Hello, I'm
+                Hello, I&apos;m
               </span>
               <span 
                 className="block mt-2 text-gray-200"
@@ -260,7 +263,7 @@ Saya berfokus pada penciptaan pengalaman digital yang menarik dan selalu berupay
         </div>
         
         <blockquote className="text-gray-300 text-center lg:text-left italic font-medium text-sm relative z-10 pl-6">
-          "Leveraging AI as a professional tool, not a replacement."
+          &quot;Leveraging AI as a professional tool, not a replacement.&quot;
         </blockquote>
       </div>
 
@@ -298,7 +301,7 @@ Saya berfokus pada penciptaan pengalaman digital yang menarik dan selalu berupay
         </a>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-20px); }

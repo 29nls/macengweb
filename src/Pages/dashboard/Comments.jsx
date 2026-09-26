@@ -190,8 +190,8 @@ export default function Comments() {
       {/* Result count when searching */}
       {search && (
         <p className="text-xs text-gray-500 -mt-3">
-          {filtered.length} result{filtered.length !== 1 ? "s" : ""} for "
-          {search}"
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""} for
+          &quot;{search}&quot;
         </p>
       )}
 

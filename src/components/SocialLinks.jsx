@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import AOS from "aos";
 import "aos/dist/aos.css";
-import PresenceWidget from "./PresenceWidget";
 
 const socialLinks = [
   {
@@ -52,7 +51,7 @@ const socialLinks = [
     name: "TikTok",
     displayName: "Tiktok",
     subText: "@eki_zulfar",
-    icon: ({ className, ...props }) => (
+    icon: () => (
       <svg
         width="24px"
         height="24px"

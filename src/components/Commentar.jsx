@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { MessageCircle, UserCircle2, Loader2, AlertCircle, Send, ImagePlus, X, Pin } from 'lucide-react';
 import AOS from "aos";
 import "aos/dist/aos.css";
 import { supabase } from '../supabase';
 
 
-const Comment = memo(({ comment, formatDate, index, isPinned = false }) => (
+const Comment = memo(({ comment, formatDate, isPinned = false }) => (
     <div 
         className={`px-4 pt-4 pb-2 rounded-xl border transition-all group hover:shadow-lg hover:-translate-y-0.5 ${
             isPinned 
@@ -62,8 +61,9 @@ const Comment = memo(({ comment, formatDate, index, isPinned = false }) => (
         </div>
     </div>
 ));
+Comment.displayName = "Comment";
 
-const CommentForm = memo(({ onSubmit, isSubmitting, error }) => {
+const CommentForm = memo(({ onSubmit, isSubmitting }) => {
     const [newComment, setNewComment] = useState('');
     const [userName, setUserName] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
@@ -224,6 +224,7 @@ const CommentForm = memo(({ onSubmit, isSubmitting, error }) => {
         </form>
     );
 });
+CommentForm.displayName = "CommentForm";
 
 const Komentar = () => {
     const [comments, setComments] = useState([]);
@@ -401,7 +402,7 @@ const Komentar = () => {
                 )}
                 
                 <div>
-                    <CommentForm onSubmit={handleCommentSubmit} isSubmitting={isSubmitting} error={error} />
+                    <CommentForm onSubmit={handleCommentSubmit} isSubmitting={isSubmitting} />
                 </div>
 
                 <div className="space-y-4 h-[328px] overflow-y-auto overflow-x-hidden custom-scrollbar pt-1 pr-1 " data-aos="fade-up" data-aos-delay="200">
@@ -411,7 +412,6 @@ const Komentar = () => {
                             <Comment 
                                 comment={pinnedComment} 
                                 formatDate={formatDate}
-                                index={0}
                                 isPinned={true}
                             />
                         </div>
@@ -424,19 +424,18 @@ const Komentar = () => {
                             <p className="text-gray-400">No comments yet. Start the conversation!</p>
                         </div>
                     ) : (
-                        comments.map((comment, index) => (
+                        comments.map((comment) => (
                             <Comment 
                                 key={comment.id} 
                                 comment={comment} 
                                 formatDate={formatDate}
-                                index={index + (pinnedComment ? 1 : 0)}
                                 isPinned={false}
                             />
                         ))
                     )}
                 </div>
             </div>
-            <style jsx>{`
+            <style>{`
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 6px;
                 }
