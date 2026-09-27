@@ -4,7 +4,7 @@ import { supabase } from "../supabase";
 import { prepareProjects } from "../utils/projects";
 
 import PropTypes from "prop-types";
-import SwipeableViews from "react-swipeable-views";
+import SwipeablePanels from "../components/SwipeablePanels";
 import { useTheme } from "@mui/material/styles";
 import AppBar from "@mui/material/AppBar";
 import Tabs from "@mui/material/Tabs";
@@ -322,7 +322,7 @@ export default function FullWidthTabs() {
           </Tabs>
         </AppBar>
 
-        <SwipeableViews
+        <SwipeablePanels
           axis={theme.direction === "rtl" ? "x-reverse" : "x"}
           index={value}
           onChangeIndex={setValue}
@@ -396,7 +396,7 @@ export default function FullWidthTabs() {
               </div>
             </div>
           </TabPanel>
-        </SwipeableViews>
+        </SwipeablePanels>
       </Box>
     </div>
   );

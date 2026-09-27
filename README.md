@@ -47,8 +47,6 @@ cd Portofolio_V5
 npm install
 ```
 
-> If you encounter peer dependency issues: `npm install --legacy-peer-deps`
-
 ### 2. Environment Variables
 
 Create a `.env` file in the root directory:
