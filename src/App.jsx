@@ -65,7 +65,14 @@ function App() {
       <div className="pointer-events-none">
   <AnimatedBackground />
 </div>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          // Opt-in perilaku v7 sekarang agar warning future-flag di console
+          // hilang dan migrasi v7 nantinya tidak mengejutkan.
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
           {/* PUBLIC */}
           <Route
