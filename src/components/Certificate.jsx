@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Modal, IconButton, Box, Backdrop, Typography } from "@mui/material"
 import CloseIcon from "@mui/icons-material/Close"
 import FullscreenIcon from "@mui/icons-material/Fullscreen"
+import PropTypes from "prop-types"
 
 const Certificate = ({ ImgSertif }) => {
 	const [open, setOpen] = useState(false)
@@ -193,6 +194,10 @@ const Certificate = ({ ImgSertif }) => {
 			</Modal>
 		</Box>
 	)
+}
+
+Certificate.propTypes = {
+  ImgSertif: PropTypes.string,
 }
 
 export default Certificate

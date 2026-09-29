@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { MessageCircle, UserCircle2, Loader2, AlertCircle, Send, ImagePlus, X, Pin } from 'lucide-react';
 import AOS from "aos";
 import "aos/dist/aos.css";
-import { supabase } from '../supabase';
+import { supabase, isPlaceholderConfig } from '../supabase';
 
 
 const Comment = memo(({ comment, formatDate, isPinned = false }) => (
@@ -287,6 +287,10 @@ const Komentar = () => {
     // Fetch regular comments (excluding pinned) and set up real-time subscription
     useEffect(() => {
         fetchComments();
+
+        // Realtime membuka websocket yang terus mencoba ulang saat kredensial
+        // masih placeholder — lewati saja agar console tidak dipenuhi error.
+        if (isPlaceholderConfig) return;
 
         // Set up real-time subscription
         const subscription = supabase

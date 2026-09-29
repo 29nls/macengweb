@@ -16,6 +16,11 @@ import TechStackIcon from "../components/TechStackIcon";
 import AOS from "aos";
 import "aos/dist/aos.css";
 import Certificate from "../components/Certificate";
+import {
+  PortfolioSkeleton,
+  PortfolioEmpty,
+  PortfolioError,
+} from "../components/PortfolioState";
 import { Code, Award, Boxes } from "lucide-react";
 
 
@@ -124,6 +129,8 @@ export default function FullWidthTabs() {
   const [value, setValue] = useState(0);
   const [projects, setProjects] = useState([]);
   const [certificates, setCertificates] = useState([]);
+  // "idle" = masih memuat, "success" = fetch selesai, "error" = fetch gagal.
+  const [status, setStatus] = useState("idle");
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [showAllCertificates, setShowAllCertificates] = useState(false);
   const isMobile = window.innerWidth < 768;
@@ -137,6 +144,13 @@ export default function FullWidthTabs() {
 
 
   const fetchData = useCallback(async () => {
+    // Jangan tampilkan skeleton saat data masih tersedia dari cache;
+    // skeleton hanya untuk kondisi tanpa data sama sekali.
+    setStatus((prev) =>
+      prev === "error" || (projects.length === 0 && certificates.length === 0)
+        ? "idle"
+        : prev
+    );
     try {
       // Mengambil data dari Supabase secara paralel
       const [projectsResponse, certificatesResponse] = await Promise.all([
@@ -162,6 +176,7 @@ export default function FullWidthTabs() {
 
       setProjects(projectData);
       setCertificates(certificateData);
+      setStatus("success");
 
       // Store in localStorage (fungsionalitas ini tetap dipertahankan)
       localStorage.setItem("projects", JSON.stringify(projectData));
@@ -171,8 +186,9 @@ export default function FullWidthTabs() {
       window.dispatchEvent(new Event("portfolioDataUpdated"));
     } catch (error) {
       console.error("Error fetching data from Supabase:", error.message);
+      setStatus("error");
     }
-  }, []);
+  }, [projects.length, certificates.length]);
 
 
 
@@ -328,6 +344,17 @@ export default function FullWidthTabs() {
           onChangeIndex={setValue}
         >
           <TabPanel value={value} index={0} dir={theme.direction}>
+            {status === "idle" && projects.length === 0 && (
+              <PortfolioSkeleton variant="projects" />
+            )}
+            {status === "error" && projects.length === 0 && (
+              <PortfolioError variant="projects" onRetry={fetchData} />
+            )}
+            {status === "success" && projects.length === 0 && (
+              <PortfolioEmpty variant="projects" />
+            )}
+            {projects.length > 0 && (
+              <>
             <div className="container mx-auto flex justify-center items-center overflow-hidden">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
                 {displayedProjects.map((project, index) => (
@@ -355,9 +382,22 @@ export default function FullWidthTabs() {
                 />
               </div>
             )}
+              </>
+            )}
           </TabPanel>
 
           <TabPanel value={value} index={1} dir={theme.direction}>
+            {status === "idle" && certificates.length === 0 && (
+              <PortfolioSkeleton variant="certificates" />
+            )}
+            {status === "error" && certificates.length === 0 && (
+              <PortfolioError variant="certificates" onRetry={fetchData} />
+            )}
+            {status === "success" && certificates.length === 0 && (
+              <PortfolioEmpty variant="certificates" />
+            )}
+            {certificates.length > 0 && (
+              <>
             <div className="container mx-auto flex justify-center items-center overflow-hidden">
               <div className="grid grid-cols-1 md:grid-cols-3 md:gap-5 gap-4">
                 {displayedCertificates.map((certificate, index) => (
@@ -378,6 +418,8 @@ export default function FullWidthTabs() {
                   isShowingMore={showAllCertificates}
                 />
               </div>
+            )}
+              </>
             )}
           </TabPanel>
 
