@@ -1,7 +1,8 @@
-import { useEffect, useState, memo, useMemo } from "react"
+import { useEffect, memo, useMemo } from "react"
 import { FileText, Code, Award, Globe, ArrowUpRight, Sparkles } from "lucide-react"
 import AOS from 'aos'
 import 'aos/dist/aos.css'
+import usePortfolioCounts from "../hooks/usePortfolioCounts"
 
 // Memoized Components
 const Header = memo(() => (
@@ -116,53 +117,23 @@ const StatCard = memo(({ icon: Icon, color, value, label, description, animation
 StatCard.displayName = "StatCard";
 
 const AboutPage = () => {
-  // Memoized calculations
-  const [stats, setStats] = useState({
-    totalProjects: 0,
-    totalCertificates: 0,
-    YearExperience: 0,
-  });
+  // Jumlah proyek & sertifikat dihitung langsung dari Supabase (count query);
+  // cache localStorage dipakai hook sebagai nilai awal/fallback agar angka
+  // tidak "berkedip" dari 0 saat halaman baru dibuka.
+  const { projectCount, certificateCount } = usePortfolioCounts();
 
-  useEffect(() => {
-    // Cache korup (bukan JSON valid) tidak boleh membuat seluruh halaman
-    // crash — kembalikan daftar kosong agar statistik hanya menampilkan 0.
-    const readCachedList = (key) => {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(key) || "[]");
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    };
-
-    const updateStats = () => {
-      const storedProjects = readCachedList("projects");
-      const storedCertificates = readCachedList("certificates");
-      
-      const startDate = new Date("2021-11-06");
-      const today = new Date();
-      const experience = today.getFullYear() - startDate.getFullYear() -
-        (today < new Date(today.getFullYear(), startDate.getMonth(), startDate.getDate()) ? 1 : 0);
-
-      setStats({
-        totalProjects: storedProjects.length,
-        totalCertificates: storedCertificates.length,
-        YearExperience: experience
-      });
-    };
-
-    updateStats();
-
-    window.addEventListener('storage', updateStats);
-    window.addEventListener('portfolioDataUpdated', updateStats);
-
-    return () => {
-      window.removeEventListener('storage', updateStats);
-      window.removeEventListener('portfolioDataUpdated', updateStats);
-    };
+  const YearExperience = useMemo(() => {
+    const startDate = new Date("2021-11-06");
+    const today = new Date();
+    return (
+      today.getFullYear() -
+      startDate.getFullYear() -
+      (today < new Date(today.getFullYear(), startDate.getMonth(), startDate.getDate()) ? 1 : 0)
+    );
   }, []);
 
-  const { totalProjects, totalCertificates, YearExperience } = stats;
+  const totalProjects = projectCount;
+  const totalCertificates = certificateCount;
 
   // Optimized AOS initialization
   useEffect(() => {
